@@ -10,6 +10,6 @@
   "license": "ISC",
   "dependencies": {
     "canvas": "^2.11.2",
-    "gif-encoder-2": "^1.0.5"
+    "gifenc": "^1.0.3"
   }
 }

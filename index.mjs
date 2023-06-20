@@ -1,6 +1,7 @@
 import { registerFont, createCanvas, loadImage } from 'canvas';
-import GIFEncoder from 'gif-encoder-2';
 import fs from 'fs';
+import gifenc from 'gifenc';
+const { GIFEncoder, quantize, applyPalette } = gifenc;
 
 function splitString(ctx, text, maxLineLength = 500) {
   let out = '•';
@@ -65,26 +66,7 @@ async function renderEBDialog(text, options) {
   const tempCanvas = createCanvas(w, h * 0.66);
   const tempCtx = tempCanvas.getContext('2d');
 
-  const encoder = new GIFEncoder(w, h);
-
-  encoder.start();
-  encoder.setDispose(0); // this is the magic for filesize optimization
-  encoder.setTransparent(0);
-
-  // draw a blinking cursor for a little bit
-  function drawNextPage() {
-    for (let i = 0; i < 3; i++) {
-      encoder.setDelay(300);
-      ctx.drawImage(arrowBig, w - 64, h - 32);
-      encoder.addFrame(ctx);
-      encoder.setDelay(200);
-      ctx.drawImage(arrowSm, w - 64, h - 32);
-      encoder.addFrame(ctx);
-    }
-    encoder.setDelay(0);
-    ctx.drawImage(arrowNone, w - 64, h - 32);
-    encoder.addFrame(ctx);
-  }
+  const encoder = new GIFEncoder({ initialCapacity: 500000});
 
   // setup both canvasses
   const font = options.saturn ? 'normal 42px Saturn' : 'normal 42px Dialogue'
@@ -100,13 +82,35 @@ async function renderEBDialog(text, options) {
 
   // draw background and add the initial frame
   ctx.drawImage(bg, 0, 0);
-  encoder.addFrame(ctx);
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const palette = quantize(imageData.data, 16, { oneBitAlpha: true, format: "rgba4444" });
+  const indexed = applyPalette(imageData.data, palette);
+
+  encoder.writeFrame(indexed, w, h, {palette, transparent: true, dispose: 0});
+
+  // reusable shortcut for writing a frame out
+  function writeFrame(delay) {
+    const indexed = applyPalette(ctx.getImageData(0, 0, w, h).data, palette);
+    encoder.writeFrame(indexed, w, h, {delay, dispose: 0, transparent: true});
+  }
+
+  // reusable func to draw a blinking cursor for a little bit
+  function drawNextPage() {
+    for (let i = 0; i < 3; i++) {
+      ctx.drawImage(arrowBig, w - 64, h - 32);
+      writeFrame(200);
+      ctx.drawImage(arrowSm, w - 64, h - 32);
+      writeFrame(200);
+    }
+    ctx.drawImage(arrowNone, w - 64, h - 32);
+    writeFrame(0);
+  }
 
   // now clear it so we can start taking advantage of disposal one char at a time
   ctx.clearRect(0, 0, w, h);
 
   // go through each char and treat it like a command basically
-  let x = 56, y = baseY;
+  let x = 56, y = baseY + (options.saturn ? 8 : 0);
   let linesOnScreen = 1;
   let firstLine = true;
 
@@ -156,7 +160,7 @@ async function renderEBDialog(text, options) {
 
         for (let ictx of [ctx, txtCtx]) {
           ictx.font = '42px Dialogue';
-          ictx.fillText(char, x - 26, y);
+          ictx.fillText(char, x - 26, y - (options.saturn ? 4 : 0));
           ictx.font = font;
         }
         break;
@@ -166,19 +170,17 @@ async function renderEBDialog(text, options) {
           ictx.fillText(char, x, y);
         }
         x += ctx.measureText(char).width;
-        encoder.setDelay(20);
-        encoder.addFrame(ctx);
+        writeFrame(20);
         ctx.clearRect(0, 0, w, h);
     }
   }
 
   // sit on the last frame for a bit
-  encoder.setDelay(2000);
-  encoder.addFrame(ctx);
+  writeFrame(2000);
   encoder.finish();
   
   return new Promise((resolve, reject) => {
-    const buffer = encoder.out.getData();
+    const buffer = encoder.bytes();
     resolve(buffer);
   });
 }
