@@ -1,7 +1,7 @@
-import { registerFont, createCanvas, loadImage } from 'canvas';
-import fs from 'fs';
-import gifenc from 'gifenc';
-const { GIFEncoder, quantize, applyPalette } = gifenc;
+const { registerFont, createCanvas, loadImage } = require( 'canvas');
+const fs = require( 'fs');
+const gifenc = require( 'gifenc');
+const { GIFEncoder, quantize, applyPalette } = require('gifenc');
 
 function splitString(ctx, text, maxLineLength = 500) {
   let out = '•';
@@ -40,14 +40,14 @@ function splitString(ctx, text, maxLineLength = 500) {
   return out;
 }
 
-async function renderEBDialog(text, options) {
-  registerFont('./res/earthbound-dialogue.otf', {family: 'Dialogue'});
-  registerFont('./res/SenorSaturno-Aw9g.ttf', {family: 'Saturn'});
+registerFont(`${__dirname}/res/earthbound-dialogue.otf`, {family: 'Dialogue'});
+registerFont(`${__dirname}/res/SenorSaturno-Aw9g.ttf`, {family: 'Saturn'});
 
-  const bg = await loadImage(`res/${options.theme}/dialog.png`);
-  const arrowBig = await loadImage(`res/${options.theme}/arrowbig.png`);
-  const arrowSm = await loadImage(`res/${options.theme}/arrowsm.png`);
-  const arrowNone = await loadImage(`res/${options.theme}/arrownone.png`);
+async function renderEBDialog(text, options) {
+  const bg = await loadImage(`${__dirname}/res/${options.theme}/dialog.png`);
+  const arrowBig = await loadImage(`${__dirname}/res/${options.theme}/arrowbig.png`);
+  const arrowSm = await loadImage(`${__dirname}/res/${options.theme}/arrowsm.png`);
+  const arrowNone = await loadImage(`${__dirname}/res/${options.theme}/arrownone.png`);
 
   const w = 604, h = 256;
   const baseY = 34;
@@ -185,4 +185,4 @@ async function renderEBDialog(text, options) {
   });
 }
 
-export default renderEBDialog
+module.exports = { renderEBDialog };
